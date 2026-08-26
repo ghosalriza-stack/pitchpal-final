@@ -45,46 +45,98 @@ const countries = [
   { name: 'Singapore', code: '+65', flag: '🇸🇬' }
 ];
 
-const FrameImage = ({ promptText, hfKey, index }) => {
-  const [loading, setLoading] = useState(true);
+const FrameImage = ({ promptText, imageModel, redrawTrigger, index }) => {
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [imgUrl, setImgUrl] = useState('');
 
-  React.useEffect(() => {
+  const fetchImage = async () => {
     setLoading(true);
     setError(false);
-  }, [promptText, hfKey]);
+    setImgUrl('');
+    
+    const seed = Math.floor(Math.random() * 1000000);
+    const finalPrompt = "Detailed black and white comic manga storyboard sketch of this scene: " + promptText + ". highly visible dark thin pen ink lines. NO colors. NO shading. white background. cleanly drawn lineart of characters.";
 
-  const imageUrl = `${API_BASE_URL.replace('/api', '')}/api/image?prompt=${encodeURIComponent(promptText)}&hfKey=${encodeURIComponent(hfKey)}&seed=${index * 100}`;
+    if (imageModel === 'pollinations') {
+      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=800&height=500&nologo=true&seed=${seed}`;
+      setImgUrl(url);
+      // Note: we let the <img> onLoad and onError handlers toggle loading to false
+      return;
+    }
+
+    // Google Imagen goes through the backend proxy
+    const url = `${API_BASE_URL.replace('/api', '')}/api/image?prompt=${encodeURIComponent(promptText)}&imageModel=${imageModel}&seed=${seed}`;
+    
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        setImgUrl(objectUrl);
+      } else {
+        setError(true);
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error(err);
+      setError(true);
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchImage();
+  }, [promptText, imageModel, redrawTrigger]);
 
   return (
-    <div className="relative group w-full flex flex-col items-center justify-center p-2">
+    <div className="relative group w-full flex flex-col items-center justify-center p-2 min-h-[220px]">
       {loading && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 z-10 space-y-2">
-          <Loader2 className="animate-spin w-6 h-6 text-slate-400" />
-          <span className="text-xs text-slate-400 font-medium">Drawing sketch...</span>
+          <Loader2 className="animate-spin w-6 h-6 text-indigo-600" />
+          <span className="text-xs text-slate-400 font-medium">Drawing frame...</span>
         </div>
       )}
       
       {error ? (
-        <div className="p-3 text-center text-xs text-red-500 border border-red-200 bg-red-50 rounded">
-          Failed to load sketch.
+        <div className="p-3 text-center text-xs text-red-550 border border-red-200 bg-red-50 rounded flex flex-col items-center gap-2">
+          <span>Failed to load sketch.</span>
+          <button onClick={fetchImage} className="bg-red-600 hover:bg-red-750 text-white text-[10px] px-2.5 py-1 rounded transition-colors font-semibold">
+            Retry
+          </button>
         </div>
-      ) : (
-        <>
+      ) : imgUrl ? (
+        <div className="w-full flex flex-col items-center">
           <img 
-            src={imageUrl} 
+            src={imgUrl} 
             alt="Frame scene" 
             onLoad={() => setLoading(false)}
             onError={() => {
               setLoading(false);
               setError(true);
             }}
-            className="max-h-[220px] w-auto object-contain rounded border border-gray-150 shadow-sm"
+            className="max-h-[220px] w-full object-contain rounded border border-gray-150 shadow-sm"
           />
-          <small className="text-[10px] text-slate-455 mt-2 text-center italic block max-w-[280px] px-2 truncate leading-tight group-hover:whitespace-normal group-hover:break-words">
-            "{promptText}"
-          </small>
-        </>
+          <div className="flex gap-2 items-center mt-2 w-full justify-between">
+            <small className="text-[10px] text-slate-455 italic block truncate max-w-[80%]">
+              "{promptText}"
+            </small>
+            <button 
+              onClick={fetchImage}
+              className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-0.5 shrink-0"
+              title="Redraw this frame"
+            >
+              🔄 Redraw
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="text-xs text-slate-400 py-10 flex flex-col items-center gap-2">
+          <span>No image generated yet.</span>
+          <button onClick={fetchImage} className="bg-indigo-600 hover:bg-indigo-755 text-white text-xs px-4 py-1.5 rounded-lg font-semibold transition-colors">
+            Generate Frame
+          </button>
+        </div>
       )}
     </div>
   );
@@ -198,13 +250,8 @@ function App() {
   const [storyboardFrames, setStoryboardFrames] = useState(null);
   const [isStoryboardLoading, setIsStoryboardLoading] = useState(false);
   const [storyboardError, setStoryboardError] = useState('');
-  const [hfKey, setHfKey] = useState(() => {
-    try {
-      return localStorage.getItem('pitchpal_hf_key') || '';
-    } catch {
-      return '';
-    }
-  });
+  const [imageModel, setImageModel] = useState('google-imagen'); // google-imagen, pollinations
+  const [redrawTrigger, setRedrawTrigger] = useState(0);
   const dropdownRef = React.useRef(null);
   const profileDropdownRef = React.useRef(null);
   const countryDropdownRef = React.useRef(null);
@@ -335,13 +382,8 @@ function App() {
     }
   };
 
-  const handleSaveHfKey = (val) => {
-    setHfKey(val);
-    try {
-      localStorage.setItem('pitchpal_hf_key', val);
-    } catch (e) {
-      console.error(e);
-    }
+  const handleBulkRegenerate = () => {
+    setRedrawTrigger(prev => prev + 1);
   };
 
   const handleCopyScript = () => {
@@ -1176,38 +1218,36 @@ function App() {
               {/* STEP 4: STORYBOARD VIEW */}
               {step === 4 && (
                 <div className="space-y-6 animate-in fade-in">
-                  <div className="flex items-center justify-between flex-wrap gap-4 border-b border-gray-105 pb-4">
+                  <div className="flex items-center justify-between flex-wrap gap-4 border-b border-gray-150 pb-4">
                     <div>
                       <h2 className="text-2xl font-bold text-slate-900">Your Storyboard</h2>
                       <p className="text-gray-500 text-sm">Visualizing the script structure with generated line art sketches.</p>
                     </div>
+                    {storyboardFrames && (
+                      <button 
+                        onClick={handleBulkRegenerate}
+                        className="bg-white hover:bg-slate-50 text-slate-700 font-semibold px-4 py-2 border border-gray-300 rounded-lg text-sm transition-all flex items-center gap-1.5 shadow-sm active:scale-[0.98]"
+                      >
+                        🔄 Redraw All Frames
+                      </button>
+                    )}
                   </div>
 
-                  {/* Hugging Face API Key Config */}
-                  <div className="bg-slate-50 border border-gray-150 p-4 rounded-xl space-y-3">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="space-y-0.5">
-                        <h4 className="font-bold text-sm text-slate-800">Hugging Face Access Token (Optional)</h4>
-                        <p className="text-xs text-slate-500">Provide an HF token (starts with `hf_`) for Stable Diffusion image generation. If omitted, we'll draw using a free public fallback.</p>
-                      </div>
-                      <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noreferrer" className="text-xs text-indigo-600 font-semibold hover:underline">Get free token ↗</a>
+                  {/* Image Generation Model Config */}
+                  <div className="bg-slate-50 border border-gray-150 p-5 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-0.5">
+                      <h4 className="font-bold text-sm text-slate-800">Image Generation Model</h4>
+                      <p className="text-xs text-slate-550">Choose between Google Imagen 3 (fast, high quality) and Pollinations AI (free backup).</p>
                     </div>
-                    <div className="flex gap-2">
-                      <input 
-                        type="password" 
-                        placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" 
-                        value={hfKey} 
-                        onChange={(e) => handleSaveHfKey(e.target.value)} 
-                        className="flex-1 border border-gray-250 rounded-lg p-2.5 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none"
-                      />
-                      {hfKey && (
-                        <button 
-                          onClick={() => handleSaveHfKey('')} 
-                          className="px-3.5 py-2.5 bg-gray-200 hover:bg-gray-300 text-slate-700 rounded-lg text-xs font-semibold transition-all"
-                        >
-                          Clear
-                        </button>
-                      )}
+                    <div className="w-full md:w-64">
+                      <select 
+                        value={imageModel} 
+                        onChange={(e) => setImageModel(e.target.value)} 
+                        className="w-full border border-gray-250 rounded-lg p-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-slate-700 shadow-sm"
+                      >
+                        <option value="google-imagen">Google AI Studio Imagen 3</option>
+                        <option value="pollinations">Pollinations AI (Free)</option>
+                      </select>
                     </div>
                   </div>
 
@@ -1238,7 +1278,8 @@ function App() {
                             <div className="flex-1 flex flex-col items-center justify-center p-2 border border-dashed border-gray-200 rounded-lg bg-white min-h-[220px] relative overflow-hidden">
                               <FrameImage 
                                 promptText={frame.image_prompt} 
-                                hfKey={hfKey} 
+                                imageModel={imageModel} 
+                                redrawTrigger={redrawTrigger}
                                 index={index + 1}
                               />
                             </div>

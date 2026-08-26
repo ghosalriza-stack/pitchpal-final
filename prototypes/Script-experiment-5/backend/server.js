@@ -76,7 +76,7 @@ app.post('/api/analyze', upload.array('files'), async (req, res) => {
         }
 
         // Call Gemini to analyze the brief
-        const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite" });
         const prompt = `
             Analyze the following brand/product brief and extract the key information.
             Format the output STRICTLY as a JSON object with the following keys:
@@ -116,7 +116,7 @@ app.post('/api/generate', async (req, res) => {
     try {
         const { objective, audience, coreIdea, creatorName, instagramId } = req.body;
 
-        const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite" });
         
         let personalizationInstruction = "";
         if (creatorName || instagramId) {
@@ -182,9 +182,9 @@ app.post('/api/storyboard', async (req, res) => {
             return res.status(400).json({ error: "Script text is required to generate a storyboard." });
         }
 
-        const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite" });
 
-        const benchmarkStyle = "Describe the scene purely as a 'black and white manga line art, flat 2D coloring page, white background, no shading'. Explicitly describe the key objects.";
+        const benchmarkStyle = "Detailed manga anime comic style line art, ink drawing, thin black lines, pure white background, no shading, clean lineart.";
 
         const prompt = `You are a master Content Creator Storyboard Artist.
             I need you to generate exactly 4 frames based on the following inputs:
@@ -199,34 +199,36 @@ app.post('/api/storyboard', async (req, res) => {
               "frames": [
                 {
                   "frame_number": "01",
-                  "action": "Brief physical action.",
-                  "voiceover": "Exact dialogue.",
-                  "director_notes": "Shot Type / Angle.",
-                  "image_prompt": "Prompt for the image. ${benchmarkStyle}"
+                  "action": "Description of the physical action happening in this frame.",
+                  "voiceover": "Dialogue or narration script for this frame.",
+                  "director_notes": "Camera angle, shot type, or visual notes.",
+                  "image_prompt": "Detailed description of the visual scene (e.g. 'A young man in a clean co-working space holding a key card')."
                 },
                 {
                   "frame_number": "02",
-                  "action": "Brief physical action.",
-                  "voiceover": "Exact dialogue.",
-                  "director_notes": "Shot Type / Angle.",
-                  "image_prompt": "Prompt for the image. ${benchmarkStyle}"
+                  "action": "Description of the physical action.",
+                  "voiceover": "Dialogue or narration.",
+                  "director_notes": "Camera angle or visual notes.",
+                  "image_prompt": "Detailed description of the visual scene."
                 },
                 {
                   "frame_number": "03",
-                  "action": "Brief physical action.",
-                  "voiceover": "Exact dialogue.",
-                  "director_notes": "Shot Type / Angle.",
-                  "image_prompt": "Prompt for the image. ${benchmarkStyle}"
+                  "action": "Description of the physical action.",
+                  "voiceover": "Dialogue or narration.",
+                  "director_notes": "Camera angle or visual notes.",
+                  "image_prompt": "Detailed description of the visual scene."
                 },
                 {
                   "frame_number": "04",
-                  "action": "Brief physical action.",
-                  "voiceover": "Exact dialogue.",
-                  "director_notes": "Shot Type / Angle.",
-                  "image_prompt": "Prompt for the image. ${benchmarkStyle}"
+                  "action": "Description of the physical action.",
+                  "voiceover": "Dialogue or narration.",
+                  "director_notes": "Camera angle or visual notes.",
+                  "image_prompt": "Detailed description of the visual scene."
                 }
               ]
-            }`;
+            }
+            
+            IMPORTANT: For each frame, replace the placeholder descriptions in "action", "voiceover", "director_notes", and "image_prompt" with the actual generated details of your storyboard scene. do not copy the instructions.`;
 
         const result = await model.generateContent(prompt);
         const responseText = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
@@ -247,61 +249,73 @@ app.post('/api/storyboard', async (req, res) => {
     }
 });
 
-// Endpoint 4: Proxy/Generate Storyboard Image (handles retry logic and line-art styling)
+// Endpoint 4: Proxy/Generate Storyboard Image (handles retry logic, imageModel selection, and line-art styling)
 app.post('/api/image', async (req, res) => { res.status(405).send("Use GET /api/image"); });
 app.get('/api/image', async (req, res) => {
     try {
-        const { prompt, hfKey, seed } = req.query;
+        const { prompt, imageModel, seed } = req.query;
 
         if (!prompt) {
             return res.status(400).send("Prompt is required");
         }
 
         // Decided illustration style: pure line illustration, outline only, zero shading
-        const finalPrompt = "Coloring page outline sketch, black and white vector line art, clean line drawing, white background, no shading, outline only, zero photorealism. " + prompt;
+        const finalPrompt = "Detailed black and white comic manga storyboard sketch of this scene: " + prompt + ". highly visible dark thin pen ink lines. NO colors. NO shading. white background. cleanly drawn lineart of characters.";
 
-        // Try Hugging Face first if key is available
-        const token = hfKey || process.env.HF_API_KEY || process.env.HF_ACCESS_TOKEN || '';
-        if (token && token.trim().startsWith('hf_')) {
-            let retries = 4;
-            while (retries > 0) {
-                try {
-                    const response = await fetch("https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0", {
-                        method: "POST",
-                        headers: {
-                            "Authorization": `Bearer ${token}`,
-                            "Content-Type": "application/json"
-                        },
-                        body: JSON.stringify({ inputs: finalPrompt })
-                    });
+        const targetModel = imageModel || 'google-imagen';
+        const apiKey = process.env.GEMINI_API_KEY || '';
 
-                    if (response.status === 200) {
-                        const buffer = Buffer.from(await response.arrayBuffer());
-                        res.setHeader('Content-Type', response.headers.get('Content-Type') || 'image/png');
-                        return res.send(buffer);
-                    } else if (response.status === 503) {
-                        // Model is loading, wait 3 seconds and retry
-                        console.log(`Hugging Face model is loading. Retrying in 3 seconds... (${retries} left)`);
-                        await new Promise(resolve => setTimeout(resolve, 3000));
-                        retries--;
-                    } else {
-                        const errText = await response.text();
-                        console.error(`Hugging Face API returned status ${response.status}:`, errText);
-                        break; // Fallback to Pollinations
+        if (targetModel === 'google-imagen' && apiKey && !apiKey.startsWith('dummy_key')) {
+            console.log("Generating image via Google AI Studio Imagen...");
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: finalPrompt }] }],
+                        generationConfig: {
+                            responseModalities: ["IMAGE"]
+                        }
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    let base64Data = '';
+                    let mimeType = 'image/jpeg';
+
+                    if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts) {
+                        for (const part of data.candidates[0].content.parts) {
+                            if (part.inlineData) {
+                                base64Data = part.inlineData.data;
+                                mimeType = part.inlineData.mimeType;
+                                break;
+                            }
+                        }
                     }
-                } catch (err) {
-                    console.error("Hugging Face fetch error:", err);
-                    break; // Fallback to Pollinations
+
+                    if (base64Data) {
+                        const buffer = Buffer.from(base64Data, 'base64');
+                        res.setHeader('Content-Type', mimeType);
+                        return res.send(buffer);
+                    } else {
+                        console.warn("Gemini Imagen API returned successfully but without inlineData image parts.");
+                    }
+                } else {
+                    const errText = await response.text();
+                    console.error(`Google Imagen API returned status ${response.status}:`, errText);
                 }
+            } catch (err) {
+                console.error("Google Imagen fetch error, falling back:", err);
             }
         }
 
-        // Fallback: Pollinations.ai with line art styling
-        console.log("Using Pollinations.ai fallback for image generation...");
+        // Fallback or explicit choice: Pollinations.ai with line art styling
+        console.log("Generating image via Pollinations.ai fallback...");
         let pRetries = 3;
         while (pRetries > 0) {
             try {
-                const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=512&height=512&nologo=true&seed=${seed || 100}`;
+                const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=800&height=500&nologo=true&seed=${seed || Math.floor(Math.random() * 1000000)}`;
                 const response = await fetch(pollinationsUrl);
                 if (response.ok) {
                     const buffer = Buffer.from(await response.arrayBuffer());
