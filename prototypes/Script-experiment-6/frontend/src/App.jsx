@@ -515,7 +515,7 @@ function App() {
   const responseRatePct = totalPitchesCount > 0 ? Math.round((responsesReceivedCount / totalPitchesCount) * 100) : 0;
 
   return (
-    <div className="min-h-screen text-slate-800 flex flex-col font-sans relative overflow-x-hidden" style={{ background: 'linear-gradient(90deg, #FCE5E6 0%, #FCE5E6 58%, #DDEEF8 62%, #DDEEF8 100%)' }}>
+    <div className="min-h-screen text-slate-800 flex flex-col font-sans relative overflow-x-hidden" style={{ background: 'linear-gradient(90deg, #FCE5E6 0%, #FCE5E6 35%, #DDEEF8 75%, #DDEEF8 100%)' }}>
       {/* Decorative Background Stars */}
       <img 
         src={starPinkImg} 
