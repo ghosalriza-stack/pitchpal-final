@@ -1092,7 +1092,7 @@ function App() {
 
                   <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">Brief Details (Optional if file uploaded)</label>
-                      <textarea rows="5" placeholder="Tell us about the product, campaign goals, vibe..." className="w-full bg-white border border-slate-200 rounded-xl p-3 focus:border-[#db1888] outline-none" value={briefText} onChange={e => setBriefText(e.target.value)}></textarea>
+                      <AutoResizeTextarea placeholder="Tell us about the product, campaign goals, vibe..." className="w-full bg-white border border-slate-200 rounded-xl p-3 focus:border-[#db1888] outline-none" value={briefText} onChange={e => setBriefText(e.target.value)} />
                   </div>
 
                   <div className="flex justify-end pt-4">
@@ -1116,16 +1116,16 @@ function App() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div>
                               <label className="block text-slate-700 font-semibold mb-2 text-sm">Content goal:</label>
-                              <input type="text" placeholder="Inputs" className="w-full border border-slate-200 rounded-xl p-3 bg-white focus:border-[#db1888] outline-none text-sm text-slate-800" value={analysis.objective} onChange={e => setAnalysis({...analysis, objective: e.target.value})} />
+                              <AutoResizeTextarea className="w-full border border-slate-200 rounded-xl p-3 bg-white focus:border-[#db1888] outline-none text-sm text-slate-800" value={analysis.objective} onChange={e => setAnalysis({...analysis, objective: e.target.value})} />
                           </div>
                           <div>
                               <label className="block text-slate-700 font-semibold mb-2 text-sm">Target Audience:</label>
-                              <input type="text" placeholder="Inputs" className="w-full border border-slate-200 rounded-xl p-3 bg-white focus:border-[#db1888] outline-none text-sm text-slate-800" value={analysis.audience} onChange={e => setAnalysis({...analysis, audience: e.target.value})} />
+                              <AutoResizeTextarea className="w-full border border-slate-200 rounded-xl p-3 bg-white focus:border-[#db1888] outline-none text-sm text-slate-800" value={analysis.audience} onChange={e => setAnalysis({...analysis, audience: e.target.value})} />
                           </div>
                       </div>
                       <div>
                           <label className="block text-slate-700 font-semibold mb-2 text-sm">The Brief/Requirements</label>
-                          <textarea rows="4" placeholder="The Brief/Requirements" className="w-full border border-slate-200 rounded-xl p-3 bg-white focus:border-[#db1888] outline-none text-sm text-slate-800" value={analysis.coreIdea} onChange={e => setAnalysis({...analysis, coreIdea: e.target.value})}></textarea>
+                          <AutoResizeTextarea className="w-full border border-slate-200 rounded-xl p-3 bg-white focus:border-[#db1888] outline-none text-sm text-slate-800" value={analysis.coreIdea} onChange={e => setAnalysis({...analysis, coreIdea: e.target.value})} />
                       </div>
                   </div>
 
