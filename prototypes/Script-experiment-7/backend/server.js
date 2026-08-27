@@ -76,7 +76,10 @@ app.post('/api/analyze', upload.array('files'), async (req, res) => {
         }
 
         // Call Gemini to analyze the brief
-        const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite" });
+        const model = genAI.getGenerativeModel({ 
+            model: "gemini-3.5-flash-lite",
+            generationConfig: { responseMimeType: "application/json" }
+        });
         const prompt = `
             Analyze the following brand/product brief and extract the key information.
             Format the output STRICTLY as a JSON object with the following keys:
@@ -116,7 +119,10 @@ app.post('/api/generate', async (req, res) => {
     try {
         const { objective, audience, coreIdea, creatorName, instagramId } = req.body;
 
-        const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite" });
+        const model = genAI.getGenerativeModel({ 
+            model: "gemini-3.5-flash-lite",
+            generationConfig: { responseMimeType: "application/json" }
+        });
         
         let personalizationInstruction = "";
         if (creatorName || instagramId) {
