@@ -8,7 +8,7 @@ import profileGradientImg from './assets/profile_gradient.png';
 import starPinkImg from './assets/star_pink.png';
 import starBlueImg from './assets/star_blue.png';
 
-const API_BASE_URL = 'http://localhost:5004/api';
+const API_BASE_URL = 'http://localhost:5005/api';
 
 const AutoResizeTextarea = ({ value, onChange, className }) => {
   const textareaRef = React.useRef(null);
@@ -76,17 +76,25 @@ const FrameImage = ({ promptText, imageModel, redrawTrigger, index }) => {
     try {
       const response = await fetch(url);
       if (response.ok) {
-        const blob = await response.blob();
-        const objectUrl = URL.createObjectURL(blob);
-        setImgUrl(objectUrl);
+        const contentType = response.headers.get('Content-Type') || '';
+        if (contentType.includes('image/svg+xml')) {
+          console.warn("Backend returned SVG placeholder. Falling back to Pollinations AI client-side.");
+          const fallbackUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=800&height=500&nologo=true&seed=${seed}`;
+          setImgUrl(fallbackUrl);
+        } else {
+          const blob = await response.blob();
+          const objectUrl = URL.createObjectURL(blob);
+          setImgUrl(objectUrl);
+        }
       } else {
-        setError(true);
-        setLoading(false);
+        console.warn("Backend image generation failed. Falling back to Pollinations AI client-side.");
+        const fallbackUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=800&height=500&nologo=true&seed=${seed}`;
+        setImgUrl(fallbackUrl);
       }
     } catch (err) {
-      console.error(err);
-      setError(true);
-      setLoading(false);
+      console.error("Backend fetch error, falling back to Pollinations AI client-side:", err);
+      const fallbackUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=800&height=500&nologo=true&seed=${seed}`;
+      setImgUrl(fallbackUrl);
     }
   };
 
@@ -98,7 +106,7 @@ const FrameImage = ({ promptText, imageModel, redrawTrigger, index }) => {
     <div className="relative group w-full flex flex-col items-center justify-center p-2 min-h-[220px]">
       {loading && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 z-10 space-y-2">
-          <Loader2 className="animate-spin w-6 h-6 text-indigo-600" />
+          <Loader2 className="animate-spin w-6 h-6 text-[#db1888]" />
           <span className="text-xs text-slate-400 font-medium">Drawing frame...</span>
         </div>
       )}
@@ -128,7 +136,7 @@ const FrameImage = ({ promptText, imageModel, redrawTrigger, index }) => {
             </small>
             <button 
               onClick={fetchImage}
-              className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-0.5 shrink-0"
+              className="text-[10px] text-[#db1888] hover:text-[#be185d] font-bold flex items-center gap-0.5 shrink-0"
               title="Redraw this frame"
             >
               🔄 Redraw
@@ -138,7 +146,7 @@ const FrameImage = ({ promptText, imageModel, redrawTrigger, index }) => {
       ) : (
         <div className="text-xs text-slate-400 py-10 flex flex-col items-center gap-2">
           <span>No image generated yet.</span>
-          <button onClick={fetchImage} className="bg-indigo-600 hover:bg-indigo-755 text-white text-xs px-4 py-1.5 rounded-lg font-semibold transition-colors">
+          <button onClick={fetchImage} className="text-white text-xs px-4 py-1.5 rounded-xl font-semibold hover:scale-105 active:scale-95 transition-transform" style={primaryButtonStyle}>
             Generate Frame
           </button>
         </div>
@@ -440,7 +448,7 @@ function App() {
       // Section title
       doc.setFont("helvetica", "bold");
       doc.setFontSize(14);
-      doc.setTextColor(79, 70, 229); // indigo-600
+      doc.setTextColor(219, 24, 136); // brand pink #db1888
       doc.text(section.label, 20, yOffset);
       yOffset += 8;
       
@@ -573,14 +581,14 @@ function App() {
                 className="w-10 h-10 rounded-full text-white font-extrabold flex items-center justify-center text-base border border-white/60 hover:scale-105 active:scale-95 transition-transform"
                 style={{ backgroundImage: `url(${profileGradientImg})`, backgroundSize: 'cover' }}
               >
-                {user.name ? user.name[0].toUpperCase() : 'R'}
+                {user?.name ? user.name[0].toUpperCase() : 'R'}
               </button>
 
               {isProfileOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl py-2 z-50 text-slate-800">
                   <div className="px-4 py-2.5 border-b border-gray-150">
-                    <p className="font-semibold text-sm text-slate-900 truncate">{user.name}</p>
-                    <p className="text-xs text-slate-500 truncate mt-0.5">@{user.instagramId}</p>
+                    <p className="font-semibold text-sm text-slate-900 truncate">{user?.name}</p>
+                    <p className="text-xs text-slate-500 truncate mt-0.5">@{user?.instagramId}</p>
                   </div>
                   <button 
                     onClick={() => {
@@ -742,7 +750,7 @@ function App() {
 
             <div className="bg-slate-50 border border-dashed border-gray-200 p-4 rounded-xl text-center space-y-1">
               <p className="text-xs text-slate-500 font-semibold tracking-wider">DEMO VERIFICATION CODE</p>
-              <p className="text-xl font-bold text-indigo-650 tracking-widest">4821</p>
+              <p className="text-xl font-bold text-[#db1888] tracking-widest">4821</p>
             </div>
 
             <div className="space-y-5">
@@ -1414,7 +1422,7 @@ function App() {
             <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
               {[
                 { name: 'Riza Ghosal', email: 'riza.ghosal@gmail.com', avatar: 'RG', bg: 'bg-teal-600' },
-                { name: 'PitchPal Creator', email: 'creator@pitchpal.ai', avatar: 'PP', bg: 'bg-indigo-600' },
+                { name: 'PitchPal Creator', email: 'creator@pitchpal.ai', avatar: 'PP', bg: 'bg-[#db1888]' },
                 { name: 'Collab Studio', email: 'collab@mystudio.co', avatar: 'CS', bg: 'bg-amber-600' }
               ].map((account) => (
                 <button
@@ -1456,7 +1464,7 @@ function App() {
           <div className="bg-white rounded-2xl max-w-2xl w-full p-6 border border-gray-100 flex flex-col max-h-[85vh] text-gray-800 animate-in fade-in zoom-in duration-200">
             <div className="flex items-center justify-between pb-4 border-b border-gray-150">
               <div>
-                <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100/50 uppercase tracking-wider">{viewingPitch.date}</span>
+                <span className="text-xs font-semibold text-[#db1888] bg-pink-50 px-2 py-0.5 rounded border border-pink-100/50 uppercase tracking-wider">{viewingPitch.date}</span>
                 <h3 className="text-xl font-bold text-gray-900 mt-1">{viewingPitch.brand}</h3>
               </div>
               <button 
@@ -1481,7 +1489,7 @@ function App() {
                     return (
                       <div key={varKey} className="bg-slate-50 border border-gray-150 rounded-xl p-4 space-y-3">
                         <div className="flex justify-between items-center">
-                          <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-100">{readableName} Script</span>
+                          <span className="text-xs font-bold text-[#db1888] bg-pink-50 px-2.5 py-1 rounded-full border border-pink-100">{readableName} Script</span>
                           <button
                             onClick={() => {
                               const text = `HOOK (0-3s):\n${script.hook}\n\nSETUP (3-15s):\n${script.setup}\n\nCONTENT (15-45s):\n${script.content}\n\nCTA (3-5s):\n${script.cta}`;

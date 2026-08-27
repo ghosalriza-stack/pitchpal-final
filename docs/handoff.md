@@ -72,3 +72,45 @@ An integrated prototype that stitches the complete creation flow: **Login -> Bri
 4. Run `npm run dev` (Runs on http://localhost:3002).
 5. Open `http://localhost:3002` in your browser.
 
+## Script-experiment-6: Comprehensive Creator Portal (with Onboarding & Login)
+
+### Description
+An advanced, highly styled (pink brand theme) integrated prototype that models the complete creator onboarding experience. The flow contains: **Login -> Verification code (OTP) -> Onboarding profile questions -> Dashboard / Welcome Home -> New Brief Input -> Strategy review -> Script editor -> Storyboard builder**. The image generation model is selectable (Google AI Studio Imagen 3 vs. Pollinations AI).
+
+### How to Run
+
+#### 1. Backend Setup
+1. Open a terminal window.
+2. Navigate to `prototypes/Script-experiment-6/backend`: `cd prototypes/Script-experiment-6/backend`
+3. Run `npm install` (if not done already).
+4. Create a `.env` file containing your `GEMINI_API_KEY`.
+5. Run `npm start` (Runs on http://localhost:5005).
+
+#### 2. Frontend Setup
+1. Open a new terminal window.
+2. Navigate to `prototypes/Script-experiment-6/frontend`: `cd prototypes/Script-experiment-6/frontend`
+3. Run `npm install` (if not done already).
+4. Run `npm run dev` (Runs on http://localhost:3005).
+5. Open `http://localhost:3005` in your browser.
+
+## Script-experiment-7: Direct Creator Storyboard Flow (Bypassed Login/Onboarding)
+
+### Description
+A variant of the comprehensive creator portal that bypasses the login/OTP and onboarding stages entirely, starting the user directly at the welcome dashboard with a pre-configured mock creator profile. This enables immediate testing of the brand strategy extraction, script variations, and visual storyboard generator (using Google AI Studio Imagen 3 and Pollinations.ai fallback).
+
+### How to Run
+
+#### 1. Backend Setup
+1. Open a terminal window.
+2. Navigate to `prototypes/Script-experiment-7/backend`: `cd prototypes/Script-experiment-7/backend`
+3. Run `npm install` (if not done already).
+4. Create a `.env` file containing your `GEMINI_API_KEY`.
+5. Run `npm start` (Runs on http://localhost:5006).
+
+#### 2. Frontend Setup
+1. Open a new terminal window.
+2. Navigate to `prototypes/Script-experiment-7/frontend`: `cd prototypes/Script-experiment-7/frontend`
+3. Run `npm install` (if not done already).
+4. Run `npm run dev` (Runs on http://localhost:3006).
+5. Open `http://localhost:3006` in your browser.
+
