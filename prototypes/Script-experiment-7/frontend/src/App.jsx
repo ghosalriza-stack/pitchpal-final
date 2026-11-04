@@ -163,13 +163,20 @@ function App() {
   const [user, setUser] = useState(() => {
     try {
       const savedUser = localStorage.getItem('pitchpal_user');
-      return savedUser ? JSON.parse(savedUser) : { name: 'PitchPal Creator', instagramId: 'creator' };
+      return savedUser ? JSON.parse(savedUser) : null;
     } catch {
-      return { name: 'PitchPal Creator', instagramId: 'creator' };
+      return null;
     }
   });
 
-  const [step, setStep] = useState('welcome');
+  const [step, setStep] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('pitchpal_user');
+      return savedUser ? 'welcome' : 'login';
+    } catch {
+      return 'login';
+    }
+  });
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -585,17 +592,18 @@ function App() {
                   </div>
                   <button 
                     onClick={() => {
-                      setUser({ name: 'PitchPal Creator', instagramId: 'creator' });
                       try {
                         localStorage.removeItem('pitchpal_user');
                       } catch (e) {
                         console.error(e);
                       }
-                      setStep('welcome');
+                      setUser(null);
+                      setStep('login');
                       setIsProfileOpen(false);
                       setPhoneInput('');
                       setSelectedEmail('');
                       setOtpInput(['','','','']);
+                      setOtpError('');
                       setOnboardingData({ name: '', instagramId: '' });
                     }}
                     className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 font-medium mt-1 transition-colors"
