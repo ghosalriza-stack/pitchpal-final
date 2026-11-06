@@ -647,11 +647,15 @@ app.get('/api/image', async (req, res) => {
   res.redirect(fallbackUrl);
 });
 
-// Health check
+// Root & Health check
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', app: 'PitchPal Script-experiment-9 API Backend', port: PORT });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', port: PORT, prototype: 'Script-experiment-9' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Script-experiment-9 backend running on port ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Script-experiment-9 backend running on http://0.0.0.0:${PORT} and http://localhost:${PORT}`);
 });

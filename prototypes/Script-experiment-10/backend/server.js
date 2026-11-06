@@ -66,7 +66,8 @@ async function searchDDG(query) {
     const response = await fetch(url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-      }
+      },
+      signal: AbortSignal.timeout(6000)
     });
     if (!response.ok) {
       console.warn(`DDG search failed for query: "${query}" with status: ${response.status}`);
@@ -116,7 +117,8 @@ async function searchWebRealtime(brandName) {
   try {
     const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleanBrand)}&utf8=&format=json`;
     const wikiRes = await fetch(wikiUrl, {
-      headers: { 'User-Agent': 'PitchPal-Research/1.0 (contact@pitchpal.ai)' }
+      headers: { 'User-Agent': 'PitchPal-Research/1.0 (contact@pitchpal.ai)' },
+      signal: AbortSignal.timeout(5000)
     });
     if (wikiRes.ok) {
       const wikiData = await wikiRes.json();
@@ -151,7 +153,10 @@ async function searchWebRealtime(brandName) {
 // Resilient generative model with automatic fallback across models
 async function generateWithFallback(prompt, generationConfig = {}) {
   const candidateModels = [
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
     'gemini-flash-latest',
+    'gemini-1.5-flash',
     'gemini-3.6-flash',
     'gemini-3.5-flash',
     'gemma-4-26b-a4b-it'
@@ -180,7 +185,12 @@ async function generateWithFallback(prompt, generationConfig = {}) {
 // Robust JSON sanitizer to handle raw unescaped newlines and control characters from LLMs
 function cleanAndParseJson(text) {
   if (!text) return {};
-  const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+  let cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+  }
   try {
     return JSON.parse(cleaned);
   } catch (err1) {
@@ -220,11 +230,12 @@ app.post('/api/research', async (req, res) => {
     return res.status(400).json({ error: "Brand name is required." });
   }
 
+  let webResults = [];
   try {
     console.log(`[Script-10] Performing real-time web research on: "${brandName}"...`);
     
     // Fetch live web results
-    const webResults = await searchWebRealtime(brandName);
+    webResults = await searchWebRealtime(brandName);
     console.log(`[Script-10] Retrieved ${webResults.length} real-time search results for "${brandName}".`);
 
     const searchContext = webResults.map((item, idx) => {
@@ -340,92 +351,97 @@ app.post('/api/research', async (req, res) => {
   } catch (error) {
     console.error("Error in /api/research:", error);
     
-    // Extract actual real data from search results if available
-    const brand = brandName || "Brand";
-    const niche = creatorProfile?.niche || "Lifestyle & Creative";
-    const lighting = creatorProfile?.lighting || "Natural Light / Sunlit";
-    const env = creatorProfile?.environment || "Vlogging & On-The-Go";
-    const creatorName = creatorProfile?.name || "Creator";
-    const handle = creatorProfile?.instagramId || "creator";
+    try {
+      // Extract actual real data from search results if available
+      const brand = brandName || "Brand";
+      const niche = creatorProfile?.niche || "Lifestyle & Creative";
+      const lighting = creatorProfile?.lighting || "Natural Light / Sunlit";
+      const env = creatorProfile?.environment || "Vlogging & On-The-Go";
+      const creatorName = creatorProfile?.name || "Creator";
+      const handle = creatorProfile?.instagramId || "creator";
 
-    const topTitles = (webResults || []).map(r => r.title.replace(/[-|].*$/, '').trim()).filter(t => t.length > 2).slice(0, 5);
-    const heroFound = topTitles.length > 0 ? topTitles[0] : `${brand} Products`;
-    const snippetText = (webResults || []).map(r => r.snippet).join(' ');
+      const topTitles = (Array.isArray(webResults) ? webResults : []).map(r => (r.title || '').replace(/[-|].*$/, '').trim()).filter(t => t.length > 2).slice(0, 5);
+      const heroFound = topTitles.length > 0 ? topTitles[0] : `${brand} Products`;
+      const snippetText = (Array.isArray(webResults) ? webResults : []).map(r => r.snippet || '').join(' ');
 
-    const fallbackData = {
-      category: topTitles.length > 0 ? `${brand} (${topTitles[0]})` : `${brand} Category`,
-      market: "Global & Direct-to-Consumer",
-      brandSnapshot: {
-        standsFor: snippetText ? snippetText.slice(0, 180) + '...' : `Authenticity and quality in the ${niche} space.`,
-        personality: "Authentic, Modern, Vibrant, Purpose-Driven",
-        toneOfVoice: "Honest, Conversational, Inspiring",
-        visualPersonality: "Clean, high-energy, modern aesthetic with real-world lifestyle framing.",
-        brandPromise: `To empower modern consumers with uncompromised quality and clean performance.`
-      },
-      productCategory: {
-        currentlySells: topTitles.length > 0 ? topTitles.join(', ') : `Flagship lines in the ${brand} lineup.`,
-        priceContext: "Direct-to-consumer premium / accessible value"
-      },
-      productFeatures: {
-        commonHeroCues: "High performance, clean ingredients, durable materials, instant payoff.",
-        heroExample: heroFound
-      },
-      featuresToBenefits: [
-        { feature: "Clean, uncompromised ingredients/materials", benefit: "Peace of mind and premium daily performance" },
-        { feature: "Thoughtful, ergonomic packaging", benefit: "Effortless on-the-go routine integration" }
-      ],
-      targetAudience: {
-        primaryTG: "Conscious Gen Z & Millennials (18-34)",
-        secondaryTG: "Active lifestyle enthusiasts and quality-driven shoppers",
-        psychographics: "Values transparency, aesthetic authenticity, health/adventure, and peer recommendations."
-      },
-      audienceNeed: {
-        functionalNeed: "Reliable, easy-to-use products that genuinely deliver on their claims.",
-        emotionalNeed: "Confidence and feeling aligned with an honest brand.",
-        lifestyleNeed: "Seamless fit into busy daily schedules.",
-        jtbd: `Deliver dependable results without unnecessary friction.`
-      },
-      painPoints: {
-        productPainPoints: "Tired of artificial marketing claims, over-promising, and poor durability.",
-        buyingPainPoints: "Difficulty finding brands that align with modern lifestyle values."
-      },
-      competitiveContext: `Stands apart from legacy competitors by putting transparency and creator-driven proof first.`,
-      brandContentGap: "Needs more relatable, real-world UGC showcasing authentic routine integration.",
-      coreMessagingPillars: [
-        "Unfiltered Transparency",
-        "Performance You Can Feel",
-        "Everyday Lifestyle Essential"
-      ],
-      creatorOpportunity: "Perfect opportunity for creators with high audience trust to showcase honest field testing.",
-      creatorMatch: {
-        matchScore: 94,
-        compatibilityLevel: "High Synergy Match",
-        synergyOverview: `${creatorName} (@${handle}) has an authentic presence in ${niche} that directly mirrors ${brand}'s core values. Your visual setup and candid style create an immediate bridge to high-intent buyers.`,
-        nicheAlignment: `Your focus on ${niche} aligns directly with ${brand}'s target demographic, making product integration feel natural and conversational rather than like a traditional ad.`,
-        lightingAndEnvironmentFit: `Shooting in ${lighting} within a ${env} setup provides the exact raw, relatable visual warmth that makes UGC convert for ${brand}. It contrasts against sterile corporate ads.`,
-        identityAndAudienceFit: `Your genuine creator voice and direct relationship with your community makes you an ideal ambassador for ${brand}'s community-first marketing.`,
-        tailoredUgcAngles: [
-          {
-            title: "1. The Raw Field Test",
-            hook: `If you are still searching for the real deal in ${brand}, look at this...`,
-            concept: `Filmed in ${lighting} (${env}), demonstrating real-life usage and highlighting instant payoff.`
-          },
-          {
-            title: "2. Why I Switched My Daily Routine",
-            hook: `Here is the one thing about ${brand} that genuinely caught me off guard.`,
-            concept: `Close-up demonstration comparing previous frustrations with this streamlined solution.`
-          },
-          {
-            title: "3. Day-in-the-Life Essential",
-            hook: `Come along with me for a quick shoot—packing only the essentials today.`,
-            concept: `Handheld vlog POV framing ${brand} as an effortless companion for daily adventures.`
-          }
+      const fallbackData = {
+        category: topTitles.length > 0 ? `${brand} (${topTitles[0]})` : `${brand} Category`,
+        market: "Global & Direct-to-Consumer",
+        brandSnapshot: {
+          standsFor: snippetText ? snippetText.slice(0, 180) + '...' : `Authenticity and quality in the ${niche} space.`,
+          personality: "Authentic, Modern, Vibrant, Purpose-Driven",
+          toneOfVoice: "Honest, Conversational, Inspiring",
+          visualPersonality: "Clean, high-energy, modern aesthetic with real-world lifestyle framing.",
+          brandPromise: `To empower modern consumers with uncompromised quality and clean performance.`
+        },
+        productCategory: {
+          currentlySells: topTitles.length > 0 ? topTitles.join(', ') : `Flagship lines in the ${brand} lineup.`,
+          priceContext: "Direct-to-consumer premium / accessible value"
+        },
+        productFeatures: {
+          commonHeroCues: "High performance, clean ingredients, durable materials, instant payoff.",
+          heroExample: heroFound
+        },
+        featuresToBenefits: [
+          { feature: "Clean, uncompromised ingredients/materials", benefit: "Peace of mind and premium daily performance" },
+          { feature: "Thoughtful, ergonomic packaging", benefit: "Effortless on-the-go routine integration" }
         ],
-        customPitchLetter: `Hi ${brand} Team,\n\nI'm ${creatorName} (@${handle}), a creator in the ${niche} space. I've been following ${brand}'s approach to transparent, high-impact products and love how your community responds to authentic storytelling.\n\nMy content focuses on honest, real-life reviews shot with ${lighting} in ${env} environments. I've put together a 3-part UGC concept showing how ${brand} integrates into everyday routines—designed to drive genuine engagement and conversions.\n\nWould love to share the storyboard concepts with you. Let me know if you'd be open to a quick collaboration chat!\n\nBest,\n${creatorName}`
-      }
-    };
+        targetAudience: {
+          primaryTG: "Conscious Gen Z & Millennials (18-34)",
+          secondaryTG: "Active lifestyle enthusiasts and quality-driven shoppers",
+          psychographics: "Values transparency, aesthetic authenticity, health/adventure, and peer recommendations."
+        },
+        audienceNeed: {
+          functionalNeed: "Reliable, easy-to-use products that genuinely deliver on their claims.",
+          emotionalNeed: "Confidence and feeling aligned with an honest brand.",
+          lifestyleNeed: "Seamless fit into busy daily schedules.",
+          jtbd: `Deliver dependable results without unnecessary friction.`
+        },
+        painPoints: {
+          productPainPoints: "Tired of artificial marketing claims, over-promising, and poor durability.",
+          buyingPainPoints: "Difficulty finding brands that align with modern lifestyle values."
+        },
+        competitiveContext: `Stands apart from legacy competitors by putting transparency and creator-driven proof first.`,
+        brandContentGap: "Needs more relatable, real-world UGC showcasing authentic routine integration.",
+        coreMessagingPillars: [
+          "Unfiltered Transparency",
+          "Performance You Can Feel",
+          "Everyday Lifestyle Essential"
+        ],
+        creatorOpportunity: "Perfect opportunity for creators with high audience trust to showcase honest field testing.",
+        creatorMatch: {
+          matchScore: 94,
+          compatibilityLevel: "High Synergy Match",
+          synergyOverview: `${creatorName} (@${handle}) has an authentic presence in ${niche} that directly mirrors ${brand}'s core values. Your visual setup and candid style create an immediate bridge to high-intent buyers.`,
+          nicheAlignment: `Your focus on ${niche} aligns directly with ${brand}'s target demographic, making product integration feel natural and conversational rather than like a traditional ad.`,
+          lightingAndEnvironmentFit: `Shooting in ${lighting} within a ${env} setup provides the exact raw, relatable visual warmth that makes UGC convert for ${brand}. It contrasts against sterile corporate ads.`,
+          identityAndAudienceFit: `Your genuine creator voice and direct relationship with your community makes you an ideal ambassador for ${brand}'s community-first marketing.`,
+          tailoredUgcAngles: [
+            {
+              title: "1. The Raw Field Test",
+              hook: `If you are still searching for the real deal in ${brand}, look at this...`,
+              concept: `Filmed in ${lighting} (${env}), demonstrating real-life usage and highlighting instant payoff.`
+            },
+            {
+              title: "2. Why I Switched My Daily Routine",
+              hook: `Here is the one thing about ${brand} that genuinely caught me off guard.`,
+              concept: `Close-up demonstration comparing previous frustrations with this streamlined solution.`
+            },
+            {
+              title: "3. Day-in-the-Life Essential",
+              hook: `Come along with me for a quick shoot—packing only the essentials today.`,
+              concept: `Handheld vlog POV framing ${brand} as an effortless companion for daily adventures.`
+            }
+          ],
+          customPitchLetter: `Hi ${brand} Team,\n\nI'm ${creatorName} (@${handle}), a creator in the ${niche} space. I've been following ${brand}'s approach to transparent, high-impact products and love how your community responds to authentic storytelling.\n\nMy content focuses on honest, real-life reviews shot with ${lighting} in ${env} environments. I've put together a 3-part UGC concept showing how ${brand} integrates into everyday routines—designed to drive genuine engagement and conversions.\n\nWould love to share the storyboard concepts with you. Let me know if you'd be open to a quick collaboration chat!\n\nBest,\n${creatorName}`
+        }
+      };
 
-    res.json(fallbackData);
+      return res.json(fallbackData);
+    } catch (fallbackError) {
+      console.error("Fallback construction error:", fallbackError);
+      return res.status(500).json({ error: "Failed to research brand. Please try again." });
+    }
   }
 });
 
@@ -708,11 +724,20 @@ app.get('/api/image', async (req, res) => {
   res.redirect(fallbackUrl);
 });
 
-// Health check
+// Root info & health check
+app.get('/', (req, res) => {
+  res.json({
+    status: 'ok',
+    app: 'PitchPal Script-experiment-10 API Backend',
+    port: PORT,
+    endpoints: ['/api/health', '/api/research', '/api/analyze', '/api/generate-scripts', '/api/image']
+  });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', port: PORT, prototype: 'Script-experiment-10' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Script-experiment-10 backend running on port ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Script-experiment-10 backend running on http://0.0.0.0:${PORT} and http://localhost:${PORT}`);
 });
